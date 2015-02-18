@@ -4,26 +4,27 @@ from __future__ import print_function, division
 from numpy import *
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
-import os
-import glob
+
+from hitran_supplemental import *
+
 
 __all__ = ['lorentzian_profile', 'read_hitran2012_parfile', 'translate_molecule_identifier',
            'get_molecule_identifier', 'calculate_hitran_xsec', 'downsample_spectrum', 'draw_block_spectrum']
 
 ## ======================================================
-def lorentzian_profile(kappa, S, gamma, kappa0):
+def lorentzian_profile(wavn, S, gamma, wavn0):
     '''
     Calculate a Lorentzian absorption profile.
 
     Parameters
     ----------
-    kappa : ndarray
+    wavn : ndarray
         The array of wavenumbers at which to sample the profile.
     S : float
         The absorption line "strength" (the integral of the entire line is equal to S).
     gamma : float
         The linewidth parameter of the profile.
-    kappa0 : float
+    wavn0 : float
         The center position of the profile (in wavenumbers).
 
     Returns
@@ -31,30 +32,30 @@ def lorentzian_profile(kappa, S, gamma, kappa0):
     L : ndarray
         The sampled absorption profile.
     '''
-    L = (S / pi) * gamma / ((kappa - kappa0)**2 + gamma**2)
+    L = (S / pi) * gamma / ((wavn - wavn0)**2 + gamma**2)
     return(L)
     
 ## =========
-def doppler_profile(wavn, S, alpha, wav0):
+def doppler_profile(wavn, S, alpha, wavn0):
     '''
     doppler profile
     '''
-    G = (S / (sqrt(pi)*alpha)) * exp(-((wavn-wav0) / alpha)**2)
+    G = (S / (sqrt(pi)*alpha)) * exp(-((wavn-wavn0) / alpha)**2)
     return(G)
     
 ## =========
-def voigt_profile(wavn, S, alpha, gamma, wav0):
+def voigt_profile(wavn, S, alpha, gamma, wavn0):
     '''
     voigt profile
     '''
     from scipy.special import wofz
-    z = ((wavn-wav0) + 1j*gamma)/(alpha)
+    z = ((wavn-wavn0) + 1j*gamma)/(alpha)
     V = S/(sqrt(pi)*alpha)*wofz(z).real
     return(V)
 
 ## ======================================================
 def read_hitran2012_parfile(filename, wavemin=0., wavemax=60000.):
-    '''
+    """
     Given a HITRAN2012-format text file, read in the parameters of the molecular absorption features.
 
     Parameters
@@ -66,7 +67,7 @@ def read_hitran2012_parfile(filename, wavemin=0., wavemax=60000.):
     ------
     data : dict
         The dictionary of HITRAN data for the molecule.
-    '''
+    """
 
     if filename.endswith('.zip'):
         import zipfile
@@ -134,117 +135,12 @@ def read_hitran2012_parfile(filename, wavemin=0., wavemax=60000.):
 
     return(data)
 
-## ======================================================
-def translate_molecule_identifier(M):
-    '''
-    For a given input molecule identifier number, return the corresponding molecular formula.
-
-    Parameters
-    ----------
-    M : int
-        The HITRAN molecule identifier number.
-
-    Returns
-    -------
-    molecular_formula : str
-        The string describing the molecule.
-    '''
-
-    trans = { '1':'H2O',    '2':'CO2',   '3':'O3',      '4':'N2O',   '5':'CO',    '6':'CH4',   '7':'O2',     '8':'NO',
-              '9':'SO2',   '10':'NO2',  '11':'NH3',    '12':'HNO3', '13':'OH',   '14':'HF',   '15':'HCl',   '16':'HBr',
-             '17':'HI',    '18':'ClO',  '19':'OCS',    '20':'H2CO', '21':'HOCl', '22':'N2',   '23':'HCN',   '24':'CH3Cl',
-             '25':'H2O2',  '26':'C2H2', '27':'C2H6',   '28':'PH3',  '29':'COF2', '30':'SF6',  '31':'H2S',   '32':'HCOOH',
-             '33':'HO2',   '34':'O',    '35':'ClONO2', '36':'NO+',  '37':'HOBr', '38':'C2H4', '39':'CH3OH', '40':'CH3Br',
-             '41':'CH3CN', '42':'CF4',  '43':'C4H2',   '44':'HC3N', '45':'H2',   '46':'CS',   '47':'SO3'}
-    return(trans[str(M)])
-
-## ======================================================
-def get_molecule_identifier(molecule_name):
-    '''
-    For a given input molecular formula, return the corresponding HITRAN molecule identifier number.
-
-    Parameters
-    ----------
-    molecular_formula : str
-        The string describing the molecule.
-
-    Returns
-    -------
-    M : int
-        The HITRAN molecular identified number.
-    '''
-
-    trans = { '1':'H2O',    '2':'CO2',   '3':'O3',      '4':'N2O',   '5':'CO',    '6':'CH4',   '7':'O2',     '8':'NO',
-              '9':'SO2',   '10':'NO2',  '11':'NH3',    '12':'HNO3', '13':'OH',   '14':'HF',   '15':'HCl',   '16':'HBr',
-             '17':'HI',    '18':'ClO',  '19':'OCS',    '20':'H2CO', '21':'HOCl', '22':'N2',   '23':'HCN',   '24':'CH3Cl',
-             '25':'H2O2',  '26':'C2H2', '27':'C2H6',   '28':'PH3',  '29':'COF2', '30':'SF6',  '31':'H2S',   '32':'HCOOH',
-             '33':'HO2',   '34':'O',    '35':'ClONO2', '36':'NO+',  '37':'HOBr', '38':'C2H4', '39':'CH3OH', '40':'CH3Br',
-             '41':'CH3CN', '42':'CF4',  '43':'C4H2',   '44':'HC3N', '45':'H2',   '46':'CS',   '47':'SO3'}
-    ## Invert the dictionary.
-    trans = {v:k for k,v in trans.items()}
-    return(int(trans[molecule_name]))
-    
-## ======================================================
-def molecule_mass(M):
-    
-    masses = { '1':18.01,    '2':43.99,   '3':47.98,     '4':44.00,   '5':27.99,   '6':16.03,   '7':31.99,    '8':30.00,
-               '9':63.96,   '10':45.99,  '11':17.03,    '12':63.00,  '13':17.00,  '14':20.01,  '15':35.98,   '16':79.93,
-              '17':127.91,  '18':50.96,  '19':59.97,    '20':30.01,  '21':51.97,  '22':28.01,  '23':27.01,   '24':50.00,
-              '25':34.01,   '26':26.02,  '27':30.05,    '28':34.00,  '29':65.99,  '30':145.96, '31':33.99,   '32':46.01,
-              '33':33.00,   '34':15.99,  '35':96.96,    '36':30.00,  '37':95.92,  '38':28.03,  '39':32.03,   '40':93.94,
-              '41':41.03,   '42':87.99,  '43':50.00,    '44':61.00,  '45':52.00,  '46':43.97,  '47':2.01,    '48':48.00,
-              '49':40.00,   '50':15.00,  '51':76.00}
-    return(masses[str(M)])
-
-
-
-Tdata = [60.,  85., 110., 135., 160., 185., 210., 235.,
-         260., 285., 310., 335., 360., 385., 410., 435., 460., 485.,
-         510., 535., 560., 585., 610., 635., 660., 685., 710., 735.,
-         760., 785., 810., 835., 860., 885., 910., 935., 960., 985.,
-         1010.,1035.,1060.,1085.,1110.,1135.,1160.,1185.,1210.,1235.,
-         1260.,1285.,1310.,1335.,1360.,1385.,1410.,1435.,1460.,1485.,
-         1510.,1535.,1560.,1585.,1610.,1635.,1660.,1685.,1710.,1735.,
-         1760.,1785.,1810.,1835.,1860.,1885.,1910.,1935.,1960.,1985.,
-         2010.,2035.,2060.,2085.,2110.,2135.,2160.,2185.,2210.,2235.,
-         2260.,2285.,2310.,2335.,2360.,2385.,2410.,2435.,2460.,2485.,
-         2510.,2535.,2560.,2585.,2610.,2635.,2660.,2685.,2710.,2735.,
-         2760.,2785.,2810.,2835.,2860.,2885.,2910.,2935.,2960.,2985.,
-         3010.]
-
-qt_tab = [0.54800E+02, 0.91500E+02, 0.13410E+03,
-          0.18180E+03, 0.23410E+03, 0.29070E+03, 0.35140E+03, 0.41600E+03,
-          0.48450E+03, 0.55720E+03, 0.63420E+03, 0.71600E+03, 0.80310E+03,
-          0.89590E+03, 0.99520E+03, 0.11017E+04, 0.12161E+04, 0.13393E+04,
-          0.14721E+04, 0.16155E+04, 0.17706E+04, 0.19384E+04, 0.21202E+04,
-          0.23172E+04, 0.25307E+04, 0.27624E+04, 0.30137E+04, 0.32864E+04,
-          0.35823E+04, 0.39034E+04, 0.42519E+04, 0.46300E+04, 0.50402E+04,
-          0.54853E+04, 0.59679E+04, 0.64913E+04, 0.70588E+04, 0.76739E+04,
-          0.83404E+04, 0.90625E+04, 0.98446E+04, 0.10691E+05, 0.11608E+05,
-          0.12600E+05, 0.13674E+05, 0.14835E+05, 0.16090E+05, 0.17447E+05,
-          0.18914E+05, 0.20500E+05, 0.22212E+05, 0.24063E+05, 0.26061E+05,
-          0.28218E+05, 0.30548E+05, 0.33063E+05, 0.35778E+05, 0.38708E+05,
-          0.41871E+05, 0.45284E+05, 0.48970E+05, 0.52940E+05, 0.57230E+05,
-          0.61860E+05, 0.66860E+05, 0.72250E+05, 0.78070E+05, 0.84350E+05,
-          0.91130E+05, 0.98450E+05, 0.10635E+06, 0.11488E+06, 0.12408E+06,
-          0.13403E+06, 0.14480E+06, 0.15640E+06, 0.16890E+06, 0.18240E+06,
-          0.19700E+06, 0.21280E+06, 0.22980E+06, 0.24830E+06, 0.26820E+06,
-          0.28970E+06, 0.31290E+06, 0.33800E+06, 0.36520E+06, 0.39450E+06,
-          0.42600E+06, 0.46000E+06, 0.49700E+06, 0.53700E+06, 0.58100E+06,
-          0.62700E+06, 0.67800E+06, 0.73300E+06, 0.79200E+06, 0.85600E+06,
-          0.92500E+06, 0.10000E+07, 0.10800E+07, 0.11670E+07, 0.12610E+07,
-          0.13620E+07, 0.14720E+07, 0.15910E+07, 0.17190E+07, 0.18600E+07,
-          0.20100E+07, 0.21700E+07, 0.23400E+07, 0.25300E+07, 0.27300E+07,
-          0.29500E+07, 0.31800E+07, 0.34300E+07, 0.37000E+07, 0.39900E+07,
-          0.42856E+07]
-
-
 
 
     
 ## ======================================================
 def calculate_hitran_xsec(data, M, wnmin=None, wnmax=None, npts=20001, T=296.e0, p=1.0e6, units='m^2'):
-    '''
+    """
     Given the HITRAN data (line centers and line strengths) for a molecule, digitize the result into a spectrum of
     absorption cross-section in units of cm^2.
 
@@ -267,21 +163,18 @@ def calculate_hitran_xsec(data, M, wnmin=None, wnmax=None, npts=20001, T=296.e0,
         The wavenumbers at which the cross-section data is evaluated.
     xsec : array_like
         The mean absorption cross-section (in cm^2) per molecule, evaluated at the wavenumbers given by input `waves`.
-    '''
+    """
     
     import scipy.constants as constants
-    kb = constants.physical_constants['Boltzmann constant'][0]*1e7
-    c = constants.physical_constants['speed of light in vacuum'][0]*1e2
-    amu = constants.physical_constants['atomic mass constant'][0]*1e3
-    h = constants.physical_constants['Planck constant'][0]*1e7
+    kb = constants.value('Boltzmann constant')*1e7
+    c = constants.value('speed of light in vacuum')*1e2
+    amu = constants.value('atomic mass constant')*1e3
+    h = constants.value('Planck constant')*1e7
+    #kb = constants.physical_constants['Boltzmann constant'][0]*1e7
+    #c = constants.physical_constants['speed of light in vacuum'][0]*1e2
+    #amu = constants.physical_constants['atomic mass constant'][0]*1e3
+    #h = constants.physical_constants['Planck constant'][0]*1e7
     
-
-    # TIPS function for methane
-    Z = polyfit(Tdata,log(qt_tab),10)
-    ZZ = poly1d(Z)
-    qt_fun = lambda x: exp(ZZ(x))
-    print("%f %f %f %f %f" % (qt_fun(40.),qt_fun(60.),qt_fun(80.),qt_fun(100.),qt_fun(0.)) )
-
     
     if (wnmin == None):
         wnmin = amin( data['linecenter']) - 0.1
@@ -308,11 +201,13 @@ def calculate_hitran_xsec(data, M, wnmin=None, wnmax=None, npts=20001, T=296.e0,
         sys.exit()
 
     hckt = h*c/kb*(1./T-1./296.)
-    linestrengths = linestrengths*(qt_fun(296.)/qt_fun(T)) *exp(-hckt*Epp)
+    #linestrengths = linestrengths*(qt_fun(296.)/qt_fun(T)) *exp(-hckt*Epp)
+    linestrengths = linestrengths*(qtips(296., M)/qtips(T, M)) *exp(-hckt*Epp)
+
     #print("%e, %e, %e, %e" % (h*c/kb,hckt,amin(Epp),amax(Epp)) )
 
     
-    mass = molecule_mass(M)*amu
+    mass = get_molecule_mass(M)*amu
     alphas = ones_like(linecenters)*sqrt(2.0*kb*T/mass)
     
     gammas = array(data['gamma-air'][okay])
@@ -325,15 +220,9 @@ def calculate_hitran_xsec(data, M, wnmin=None, wnmax=None, npts=20001, T=296.e0,
 
     ## Create a spectrum linearly sampled in wavenumber
     wavenumbers = linspace(wnmin, wnmax, npts)
-    # waves = 10000.0 / wavenumbers
     xsec = zeros_like(wavenumbers)
 
-    ## Define the list of channel boundary wavelengths.
-    #dk = wavenumbers[1] - wavenumbers[0]
-
     nlines = alen(linecenters)
-    print("%d"%nlines)
-
     for i in arange(nlines):
         linecenter = linecenters[i]
         linestrength = linestrengths[i]
@@ -373,6 +262,8 @@ def calculate_hitran_xsec(data, M, wnmin=None, wnmax=None, npts=20001, T=296.e0,
         xsec = xsec / 10000.0
 
     return(wavenumbers, xsec)
+
+
 
 ## ======================================================
 def downsample_spectrum(waves, spectrum, downsampled_waves=None, downsampled_channel_boundaries=None):
@@ -503,6 +394,11 @@ def draw_block_spectrum(channel_boundaries, spectrum, newfigure=True, title=None
 ## ==================================================================================================
 
 if (__name__ == "__main__"):
+
+    import os
+    import glob
+
+
     #molecule = 'H2'       ## water
     #molecule = 'CO2'       ## carbon dioxide
     #molecule = 'NH3'       ## ammonia
@@ -525,12 +421,19 @@ if (__name__ == "__main__"):
     #wnmin, wnmax = (1225., 1360.)
     print('(%f.1, %f.1)' % (wnmin,wnmax))
 
-    
-    M = get_molecule_identifier(molecule)
-    filenames = glob.glob('../hitran/HITRAN2012/By-Molecule/Uncompressed-files/%02i_hit12.*' % M)
-    filename = filenames[0]
 
+    # get filename
+    HITRANDIR = os.path.expandvars('$HITRAN_ROOT/')
+    print(HITRANDIR)
+
+    HITRANDIR = os.path.expanduser('~/Documents/work/hitran')
+    print(HITRANDIR)
+
+    M = get_molecule_id(molecule)    
+    filenames = glob.glob(os.path.join(HITRANDIR,'HITRAN2012/By-Molecule/Uncompressed-files/%02i_hit12.*' % M))
+    filename = filenames[0]
     filename = os.path.normpath(os.path.abspath(filename))
+    
     data = read_hitran2012_parfile(filename, wnmin, wnmax)
     nlines = len(data['S'])
     print('Found %i lines' % nlines)
@@ -554,7 +457,7 @@ if (__name__ == "__main__"):
 
 
 
-    
+    '''
     print("sorting")
     fig, ax = plt.subplots()
     ind = xsec.argsort()
@@ -566,4 +469,11 @@ if (__name__ == "__main__"):
     sigmabar = sigmabar*(wns[1]-wns[0])  
     print ( '%e' % (sigmabar) )
     print ( '%e' % (sigmabar/(wns[-1]-wns[0])) )
+    '''
+
+    
     plt.show()
+    
+
+
+    
