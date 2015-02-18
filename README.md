@@ -1,4 +1,4 @@
-# pyhitran
+# pytran
 
 A python package to read and use the HITRAN database.
 
@@ -13,7 +13,7 @@ aid in correctly evaluating the cross sections.
 ##### hitran.py
 - [x] Read HITRAN .par files into line list dictionary
 - [x] Compute cross section from line list
-- [x ] Use partition function in computing cross section
+- [x] Use partition function in computing cross section
 - [ ] Create utilities to interpret line lists (i.e. list of
   transitions with bounds and strengths, compute band Einstein
   coefficient, etc)
