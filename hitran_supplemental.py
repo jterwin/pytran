@@ -4,7 +4,8 @@ from __future__ import division, print_function, absolute_import
 #from numpy import *
 import os
 
-__all__ = ['get_molecule_id', 'get_iso_id', 'get_molecule_mass', 'get_iso_name', 'qtips']
+__all__ = ['get_molecule_id', 'get_iso_id', 'get_molecule_mass', 'get_iso_name',
+           'get_iso_mass', 'get_molecule_nisops', 'qtips']
 
 _parsum_file_2000 = os.path.expanduser("data/parsum.dat")
 _parsum_file_2003 = os.path.expanduser("data/parsum2003.dat")
@@ -174,26 +175,7 @@ def get_iso_id(name):
     
     return(nmol,niso)
 
-    
-def get_molecule_mass(nmol):
-    """
-    Returns average mass for molecule
 
-    Parameters
-    ----------
-    nmol : integer
-        HITRAN molecule number
-
-    Returns
-    -------
-    mass : float
-        average mass of molecule
-
-    """
-    mass = sum([a*b for a,b in zip(molecule_list[str(nmol)]["abundances"],molecule_list[str(nmol)]["masses"])])
-    return(mass)
-
-    
 def get_iso_name(nmol,niso=1):
     """
     Returns full isotopologue name
@@ -230,6 +212,63 @@ def get_iso_name(nmol,niso=1):
     return(isoname)
 
 
+def get_molecule_nisops(nmol):
+    """
+    Returns number of isotopologues for molecule
+
+    Parameters
+    ----------
+    nmol : integer
+        HITRAN molecule number
+
+    Returns
+    -------
+    nisop : int
+        number of isotopologues of molecule
+
+    """
+    
+    return(len(molecule_list[str(nmol)]["isops"]))
+
+        
+def get_molecule_mass(nmol):
+    """
+    Returns average mass for molecule
+
+    Parameters
+    ----------
+    nmol : integer
+        HITRAN molecule number
+
+    Returns
+    -------
+    mass : float
+        average mass of molecule
+
+    """
+    mass = sum([a*b for a,b in zip(molecule_list[str(nmol)]["abundances"],molecule_list[str(nmol)]["masses"])])
+    return(mass)
+
+def get_iso_mass(nmol,niso):
+    """
+    Returns  mass for isotopologue
+
+    Parameters
+    ----------
+    nmol : integer
+        HITRAN molecule number
+    niso : integer
+        isotopologue number
+
+    Returns
+    -------
+    mass : float
+        mass of isotopologue
+
+    """
+    mass = molecule_list[str(nmol)]["masses"][niso]
+    return(mass)
+    
 
 def polint4(xx,yy,x):
     """
@@ -299,7 +338,7 @@ def qtips(tmp, nmol, niso=1):
     elif (tmp < 70.0):
         raise ValueError("qtips: tmp < 70 will be supported soon")
     elif (tmp < 3000.0):
-        print(tmp, nmol, niso, isoname)
+        #print(tmp, nmol, niso, isoname)
         q = polint4(qt_tab["Temp"], qt_tab[isoname], tmp)
     else:
         raise ValueError("qtips: tmp > 3000 not supported")
@@ -313,6 +352,9 @@ def qtips(tmp, nmol, niso=1):
 
 if (__name__ == "__main__"):
 
+    # various tests of the subroutines
+
+    
     #print(molecule_list['1'])
 
     '''
@@ -338,11 +380,24 @@ if (__name__ == "__main__"):
     #print(get_iso_id("CO2_222"))
     #print(get_iso_id("C6H12O6_838"))
     '''
+    
+
+    '''
+    for nmol in sorted(molecule_list):
+        print(nmol, get_molecule_nisops(nmol))
+    '''
 
 
+    
+    '''
     print(qtips(100,6,1))
+    qratio = [qtips(296.0,2,i)/qtips(103.0,2,i) for i in range(get_molecule_nisops(2))]
+    print("\n".join([str(q) for q in qratio]))
+    '''
 
-
+    
+        
+    '''
     full_iso_list = []
     for nmol in range(1,len(molecule_list)+1):
         for niso in range(len(molecule_list[str(nmol)]["isops"])):
@@ -356,5 +411,5 @@ if (__name__ == "__main__"):
         name = full_iso_list[i]
         #print(name, _qt_tab_2003[name])
         #print(name, qt_tab[name])
-
+    '''
     

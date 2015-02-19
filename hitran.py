@@ -170,54 +170,47 @@ def calculate_hitran_xsec(data, M, wnmin=None, wnmax=None, npts=20001, T=296.e0,
     c = constants.value('speed of light in vacuum')*1e2
     amu = constants.value('atomic mass constant')*1e3
     h = constants.value('Planck constant')*1e7
-    #kb = constants.physical_constants['Boltzmann constant'][0]*1e7
-    #c = constants.physical_constants['speed of light in vacuum'][0]*1e2
-    #amu = constants.physical_constants['atomic mass constant'][0]*1e3
-    #h = constants.physical_constants['Planck constant'][0]*1e7
-    
     
     if (wnmin == None):
         wnmin = amin( data['linecenter']) - 0.1
     if (wnmax == None):
         wnmax = amax( data['linecenter']) + 0.1
 
-    ## First step: remove any data points that do not correspond to the primary isotope. (If we want to use isotopes,
-    ## then we need to figure out mixing ratios.) For most HITRAN gases, the primary isotope is about 99% of the total
-    ## atmospheric composition.
+    ## First step: 
     okay = (data['I'] >= 1)
     #okay = ((wavemin-10.) <= data['linecenter'] <= (wavemax+10.))
-    #print(data['I'])
-    #print(okay)
     #okay = (data['I'] == 1) * (data['linecenter']>=(wavemin-10.)) * (data['linecenter']<=wavemax+10.)
-    #print("%d,%d" % (len(data['S']),len(okay)) )
 
+    # pull some arrays out of line list
     linecenters = array(data['linecenter'][okay])       ## line centers in wavenumbers
     linestrengths = array(data['S'][okay])
-    Epp = array(data['Epp'][okay])
-
-    if any(Epp<0.0):
+    Epps = array(data['Epp'][okay])
+    isops = array(data['I'][okay])
+    gammas = array(data['gamma-air'][okay])
+    Ns = array(data['N'])[okay]
+    
+    # check for errors in Epp (was an issue in previous versions of HITRAN)
+    if any(Epps<0.0):
         print("need to check for error flags in Epp")
         import sys
         sys.exit()
 
-    hckt = h*c/kb*(1./T-1./296.)
-    #linestrengths = linestrengths*(qt_fun(296.)/qt_fun(T)) *exp(-hckt*Epp)
-    linestrengths = linestrengths*(qtips(296., M)/qtips(T, M)) *exp(-hckt*Epp)
+    # scale line strengths to temperature
+    hck = h*c/kb
+    hckt = hck*(1./T-1./296.)
+    qratio = [qtips(296.0,M,i)/qtips(103.0,M,i) for i in range(get_molecule_nisops(M))]
+    #linestrengths = linestrengths*(qtips(296., M)/qtips(T, M)) *exp(-hckt*Epps)
+    #linestrengths = [S*qratio[int(I-1)]*exp(-hckt*Epp) for (S,I,Epp) in zip(linestrengths,isops,Epps)]
+    linestrengths = [S*qratio[int(I-1)]*exp(-hckt*Epp)*(1.0-exp(-hck*vc/T))/(1.0-exp(-hck*vc/296.0))
+                     for (vc,S,I,Epp) in zip(linecenters,linestrengths,isops,Epps)]
 
-    #print("%e, %e, %e, %e" % (h*c/kb,hckt,amin(Epp),amax(Epp)) )
-
-    
-    mass = get_molecule_mass(M)*amu
-    alphas = ones_like(linecenters)*sqrt(2.0*kb*T/mass)
-    
-    gammas = array(data['gamma-air'][okay])
-    Ns = array(data['N'])[okay]
+    # pre-calculate doppler widths and lorentz widths
+    #mass = get_molecule_mass(M)*amu
+    #alphas = ones_like(linecenters)*sqrt(2.0*kb*T/mass)
+    masses = [get_iso_mass(M,i) for i in range(get_molecule_nisops(M))]
+    alphas = [sqrt(2.0*kb*T/masses[int(I-1)]) for I in isops]
     gammas = gammas*(p/1e6)/(T/296.)**Ns
     
-    #print(mass,alphas[0]*linecenters[0]/c,gammas[0])
-
-    
-
     ## Create a spectrum linearly sampled in wavenumber
     wavenumbers = linspace(wnmin, wnmax, npts)
     xsec = zeros_like(wavenumbers)
@@ -229,7 +222,6 @@ def calculate_hitran_xsec(data, M, wnmin=None, wnmax=None, npts=20001, T=296.e0,
         gamma = gammas[i]
         alpha = alphas[i]*linecenter/c
 
-
         ## If the spectral line is well outside our region of interest, then ignore it.
         #if (linecenter < amin(wavenumbers-0.5)):
         #    continue
@@ -237,17 +229,10 @@ def calculate_hitran_xsec(data, M, wnmin=None, wnmax=None, npts=20001, T=296.e0,
         #    continue
 
         ## Note: the quantity sum(L * dk) should sum to "S"!
-        
-        #print(i, mass, alpha, gamma , linecenter, alphas[i])
-        #import sys
-        #sys.exit()
-        
         #L = lorentzian_profile(wavenumbers, linestrength, gamma, linecenter)
         #xsec += L
-        
         #D = doppler_profile(wavenumbers, linestrength, alpha, linecenter)
         #xsec += D
-        
         V = voigt_profile(wavenumbers, linestrength, alpha, gamma, linecenter)
         xsec += V
 
@@ -419,12 +404,12 @@ if (__name__ == "__main__"):
     #wnmin, wnmax = (2800., 3200.)
     wnmin, wnmax = (1090., 1225.)
     #wnmin, wnmax = (1225., 1360.)
-    print('(%f.1, %f.1)' % (wnmin,wnmax))
+    print('(%.1f, %.1f)' % (wnmin,wnmax))
 
 
     # get filename
-    HITRANDIR = os.path.expandvars('$HITRAN_ROOT/')
-    print(HITRANDIR)
+    #HITRANDIR = os.path.expandvars('$HITRAN_ROOT/')
+    #print(HITRANDIR)
 
     HITRANDIR = os.path.expanduser('~/Documents/work/hitran')
     print(HITRANDIR)
