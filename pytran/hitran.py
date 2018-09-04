@@ -5,11 +5,11 @@ from numpy import *
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 
-from hitran_supplemental import *
+from pytran.hitran_utils import *
 
 
-__all__ = ['lorentzian_profile', 'read_hitran2012_parfile', 'translate_molecule_identifier',
-           'get_molecule_identifier', 'calculate_hitran_xsec', 'downsample_spectrum', 'draw_block_spectrum']
+__all__ = ['lorentzian_profile', 'doppler_profile', 'voigt_profile', 'read_hitran2012_parfile',
+               'calculate_hitran_xsec']
 
 ## ======================================================
 def lorentzian_profile(wavn, S, gamma, wavn0):
@@ -106,7 +106,15 @@ def read_hitran2012_parfile(filename, wavemin=0., wavemax=60000.):
 
         if (wavemin <= float64(line[3:15]) <= wavemax):
             data['M'].append(uint(line[0:2]))
-            data['I'].append(uint(line[2]))
+            I = line[2]
+            if I == '0':
+                data['I'].append(uint(10))
+            elif I == 'a':
+                data['I'].append(uint(11))
+            elif I == 'b':
+                data['I'].append(uint(11))
+            else:
+                data['I'].append(uint(line[2]))
             data['linecenter'].append(float64(line[3:15]))
             data['S'].append(float64(line[15:25]))
             data['Acoeff'].append(float64(line[25:35]))
@@ -133,13 +141,13 @@ def read_hitran2012_parfile(filename, wavemin=0., wavemax=60000.):
     for key in data:
         data[key] = array(data[key])
 
-    return(data)
+    return data
 
 
 
     
 ## ======================================================
-def calculate_hitran_xsec(data, M, wnmin=None, wnmax=None, npts=20001, T=296.e0, p=1.0e6, units='m^2'):
+def calculate_hitran_xsec(data, M, wnmin=None, wnmax=None, npts=20001, T=296.e0, p=1.0e6, units='cm^2'):
     """
     Given the HITRAN data (line centers and line strengths) for a molecule, digitize the result into a spectrum of
     absorption cross-section in units of cm^2.
@@ -198,7 +206,7 @@ def calculate_hitran_xsec(data, M, wnmin=None, wnmax=None, npts=20001, T=296.e0,
     # scale line strengths to temperature
     hck = h*c/kb
     hckt = hck*(1./T-1./296.)
-    qratio = [qtips(296.0,M,i)/qtips(103.0,M,i) for i in range(get_molecule_nisops(M))]
+    qratio = [qtips(296.0,M,i)/qtips(T,M,i) for i in range(1,get_molecule_nisops(M)+1)]
     #linestrengths = linestrengths*(qtips(296., M)/qtips(T, M)) *exp(-hckt*Epps)
     #linestrengths = [S*qratio[int(I-1)]*exp(-hckt*Epp) for (S,I,Epp) in zip(linestrengths,isops,Epps)]
     linestrengths = [S*qratio[int(I-1)]*exp(-hckt*Epp)*(1.0-exp(-hck*vc/T))/(1.0-exp(-hck*vc/296.0))
@@ -207,7 +215,7 @@ def calculate_hitran_xsec(data, M, wnmin=None, wnmax=None, npts=20001, T=296.e0,
     # pre-calculate doppler widths and lorentz widths
     #mass = get_molecule_mass(M)*amu
     #alphas = ones_like(linecenters)*sqrt(2.0*kb*T/mass)
-    masses = [get_iso_mass(M,i) for i in range(get_molecule_nisops(M))]
+    masses = [get_iso_mass(M,i) for i in range(1,get_molecule_nisops(M)+1)]
     alphas = [sqrt(2.0*kb*T/masses[int(I-1)]) for I in isops]
     gammas = gammas*(p/1e6)/(T/296.)**Ns
     
@@ -375,90 +383,3 @@ def draw_block_spectrum(channel_boundaries, spectrum, newfigure=True, title=None
     return
 
 
-## ==================================================================================================
-## ==================================================================================================
-
-if (__name__ == "__main__"):
-
-    import os
-    import glob
-
-
-    #molecule = 'H2'       ## water
-    #molecule = 'CO2'       ## carbon dioxide
-    #molecule = 'NH3'       ## ammonia
-    #molecule = 'SO2'       ## sulfur dioxide
-    molecule = 'CH4'       ## methane
-    #molecule = 'H2S'       ## hydrogen sulfide
-    #molecule = 'O3'        ## ozone
-    #molecule = 'C2H6'      ## ethane
-
-    #units = 'm^2/mole'
-    #units = 'm^2.ppm'
-    #units = 'cm^2/mole'
-    #units = 'cm^2.ppm'
-    #units = 'm^2'
-    units = 'cm^2'
-
-    #wnmin, wnmax = (4000., 4600.)
-    #wnmin, wnmax = (2800., 3200.)
-    wnmin, wnmax = (1090., 1225.)
-    #wnmin, wnmax = (1225., 1360.)
-    print('(%.1f, %.1f)' % (wnmin,wnmax))
-
-
-    # get filename
-    #HITRANDIR = os.path.expandvars('$HITRAN_ROOT/')
-    #print(HITRANDIR)
-
-    HITRANDIR = os.path.expanduser('~/Documents/work/hitran')
-    print(HITRANDIR)
-
-    M = get_molecule_id(molecule)    
-    filenames = glob.glob(os.path.join(HITRANDIR,'HITRAN2012/By-Molecule/Uncompressed-files/%02i_hit12.*' % M))
-    filename = filenames[0]
-    filename = os.path.normpath(os.path.abspath(filename))
-    
-    data = read_hitran2012_parfile(filename, wnmin, wnmax)
-    nlines = len(data['S'])
-    print('Found %i lines' % nlines)
-
-    
-    ## Next set up for calculating the absorption cross-section, given the HITRAN database's values for the
-    ## line centers and line strengths.
-    print('Calculating the absorption cross-section spectrum ...')
-    (wns, xsec) = calculate_hitran_xsec(data, M, wnmin, wnmax, units=units, T=100.,p=10e1)
-
-     
-    print("plotting")
-    fig, ax = plt.subplots()
-    fig.canvas.set_window_title(molecule)
-    ax.semilogy(wns, xsec, 'k-')
-    
-    ax.set_title(molecule)
-    ax.set_ylabel('Cross-section (' + units + ')')
-    ax.set_xlabel('wavenumber (cm$^{-1}$)')
-    ax.set_xlim([wnmin-0.05*(wnmax-wnmin),wnmax+0.05*(wnmax-wnmin)])
-
-
-
-    '''
-    print("sorting")
-    fig, ax = plt.subplots()
-    ind = xsec.argsort()
-    ax.semilogy(linspace(0,1,xsec.size),xsec[ind])
-
-
-    sigmabar = sum(xsec)
-    print( '%e' % (sigmabar) )
-    sigmabar = sigmabar*(wns[1]-wns[0])  
-    print ( '%e' % (sigmabar) )
-    print ( '%e' % (sigmabar/(wns[-1]-wns[0])) )
-    '''
-
-    
-    plt.show()
-    
-
-
-    
