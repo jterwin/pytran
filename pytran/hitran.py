@@ -54,7 +54,7 @@ def voigt_profile(wavn, S, alpha, gamma, wavn0):
     return(V)
 
 ## ======================================================
-def read_hitran2012_parfile(filename, wavemin=0., wavemax=60000.):
+def read_hitran2012_parfile(filename, wavemin=0., wavemax=60000., Smin=0.):
     """
     Given a HITRAN2012-format text file, read in the parameters of the molecular absorption features.
 
@@ -104,7 +104,9 @@ def read_hitran2012_parfile(filename, wavemin=0., wavemax=60000.):
         if (len(line) < 160):
             raise ImportError, 'The imported file ("' + filename + '") does not appear to be a HITRAN2012-format data file.'
 
-        if (wavemin <= float64(line[3:15]) <= wavemax):
+        vc = float64(line[3:15])
+        S = float64(line[15:25])
+        if ((wavemin <= vc <= wavemax) and (S > Smin)):
             data['M'].append(uint(line[0:2]))
             I = line[2]
             if I == '0':
@@ -147,7 +149,7 @@ def read_hitran2012_parfile(filename, wavemin=0., wavemax=60000.):
 
     
 ## ======================================================
-def calculate_hitran_xsec(data, M, wnmin=None, wnmax=None, npts=20001, T=296.e0, p=1.0e6, units='cm^2'):
+def calculate_hitran_xsec(data, M, wavenumbers=None, npts=20001, T=296.e0, p=1.0e6, units='cm^2'):
     """
     Given the HITRAN data (line centers and line strengths) for a molecule, digitize the result into a spectrum of
     absorption cross-section in units of cm^2.
@@ -165,6 +167,11 @@ def calculate_hitran_xsec(data, M, wnmin=None, wnmax=None, npts=20001, T=296.e0,
         A string describing in what units of the output cross-section should be given in. Choices available are:
         {'cm^2/mole', 'cm^2.ppm', 'm^2/mole', 'm^2.ppm', 'm^2', cm^2}.
 
+    T : float
+        Temperature in Kelvin
+    P : float
+        Pressure in cgs (1 
+
     Returns
     -------
     waves : ndarray
@@ -179,10 +186,14 @@ def calculate_hitran_xsec(data, M, wnmin=None, wnmax=None, npts=20001, T=296.e0,
     amu = constants.value('atomic mass constant')*1e3
     h = constants.value('Planck constant')*1e7
     
-    if (wnmin == None):
+    if wavenumbers is None:
+        #Create a spectrum linearly sampled in wavenumber
         wnmin = amin( data['linecenter']) - 0.1
-    if (wnmax == None):
         wnmax = amax( data['linecenter']) + 0.1
+        wavenumbers = linspace(wnmin, wnmax, npts)
+
+
+    xsec = zeros_like(wavenumbers)
 
     ## First step: 
     okay = (data['I'] >= 1)
@@ -215,20 +226,18 @@ def calculate_hitran_xsec(data, M, wnmin=None, wnmax=None, npts=20001, T=296.e0,
     # pre-calculate doppler widths and lorentz widths
     #mass = get_molecule_mass(M)*amu
     #alphas = ones_like(linecenters)*sqrt(2.0*kb*T/mass)
-    masses = [get_iso_mass(M,i) for i in range(1,get_molecule_nisops(M)+1)]
+    masses = [get_iso_mass(M,i)*amu for i in range(1,get_molecule_nisops(M)+1)]
     alphas = [sqrt(2.0*kb*T/masses[int(I-1)]) for I in isops]
     gammas = gammas*(p/1e6)/(T/296.)**Ns
     
-    ## Create a spectrum linearly sampled in wavenumber
-    wavenumbers = linspace(wnmin, wnmax, npts)
-    xsec = zeros_like(wavenumbers)
-
     nlines = alen(linecenters)
     for i in arange(nlines):
         linecenter = linecenters[i]
         linestrength = linestrengths[i]
         gamma = gammas[i]
         alpha = alphas[i]*linecenter/c
+
+        #print(linecenter, linestrength, alpha, gamma)
 
         ## If the spectral line is well outside our region of interest, then ignore it.
         #if (linecenter < amin(wavenumbers-0.5)):
@@ -244,6 +253,8 @@ def calculate_hitran_xsec(data, M, wnmin=None, wnmax=None, npts=20001, T=296.e0,
         V = voigt_profile(wavenumbers, linestrength, alpha, gamma, linecenter)
         xsec += V
 
+        #print(linestrength, V.sum()*(wavenumbers[1]-wavenumbers[0]),  D.sum()*(wavenumbers[1]-wavenumbers[0]),  L.sum()*(wavenumbers[1]-wavenumbers[0]))
+
     if units.endswith('/mole'):
         xsec = xsec * 6.022E23
     elif units.endswith('.ppm'):
@@ -254,7 +265,7 @@ def calculate_hitran_xsec(data, M, wnmin=None, wnmax=None, npts=20001, T=296.e0,
     elif units.startswith('m^2'):
         xsec = xsec / 10000.0
 
-    return(wavenumbers, xsec)
+    return (wavenumbers, xsec)
 
 
 

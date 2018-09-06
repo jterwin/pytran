@@ -1,3 +1,3 @@
 
-from pytran.hitran_supplemental import *
+from pytran.hitran_utils import *
 from pytran.hitran import *
