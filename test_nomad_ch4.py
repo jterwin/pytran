@@ -66,7 +66,7 @@ if (__name__ == "__main__"):
         ax.set_xlim([wnmin-0.05*(wnmax-wnmin),wnmax+0.05*(wnmax-wnmin)])
 
 
-    if True:
+    if False:
         fileAtm='/bira-iasb/projects/planetary/Asimut/CommonData/Atmosphere/Mars/Mars_RefAtmosphere-fd-a461.dat'
         Z, P, T=np.loadtxt(fileAtm, dtype=float, comments='%', usecols=(0,1,2), unpack=True)
 
@@ -91,21 +91,25 @@ if (__name__ == "__main__"):
             f['wvn'] = wns
             f['sigma'] = xsec
 
-    if False:
-        print("sorting")
-        fig, ax = plt.subplots()
-        ind = xsec.argsort()
-        ax.semilogy(np.linspace(0,1,xsec.size),xsec[ind])
+    if True:
+
+        fileAtm='/bira-iasb/projects/planetary/Asimut/CommonData/Atmosphere/Mars/Mars_RefAtmosphere-fd-a461.dat'
+        Z, P, T=np.loadtxt(fileAtm, dtype=float, comments='%', usecols=(0,1,2), unpack=True)
+
+        Nden = P/T*1e3/(1.380650e-16)
+        Ncol = Nden * 10.e5
+        print(Nden[-1], Ncol[-1])
+
+        xsec =  pytran.calculate_hitran_xsec(data, M, wns, T=T[-1], p=P[-1]*1e3)[1]
+
+        Trans = np.exp(-xsec*Ncol[-1])
+
+        fig, axs = plt.subplots(2,1)
+        axs[0].plot(wns, xsec)
+        axs[0].set_yscale('log')
+        axs[1].plot(wns, Trans)
 
 
-        sigmabar = sum(xsec)
-        print( '%e' % (sigmabar) )
-        sigmabar = sigmabar*(wns[1]-wns[0])  
-        print ( '%e' % (sigmabar) )
-        print ( '%e' % (sigmabar/(wns[-1]-wns[0])) )
-    
-
-    
     plt.show()
     
 
