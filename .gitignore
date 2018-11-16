@@ -1,3 +1,9 @@
 
+*.txt
+*.dat
+*.h5
+*.png
+*.docx
+
 *.pyc
 supdata/qtips_files/q*.txt
