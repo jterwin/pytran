@@ -53,7 +53,7 @@ if (__name__ == "__main__"):
     wns = np.linspace(wnmin, wnmax, Nbwn)
 
     if False:    # plot single spectrum
-        _, xsec = pytran.calculate_hitran_xsec(data, M, wns, T=150.,p=10e3)
+        xsec = pytran.calculate_hitran_xsec(data, M, wns, T=150.,p=10e3)
 
         print("plotting")
         fig, ax = plt.subplots()
@@ -77,7 +77,7 @@ if (__name__ == "__main__"):
         xsec = np.zeros((len(T),len(wns)))
         for i in range(0,len(T)):
             print("%d of %d" % (i, len(T)))
-            xsec[i,:] =  pytran.calculate_hitran_xsec(data, M, wns, T=T[i], p=P[i]*1e3)[1]
+            xsec[i,:] =  pytran.calculate_hitran_xsec(data, M, wns, T=T[i], p=P[i]*1e3)
 
             ax.plot(wns, xsec[i,:], label='%.1f'%Z[i])
 
