@@ -49,8 +49,8 @@ def voigt_profile(wavn, S, alpha, gamma, wavn0):
     voigt profile
     '''
     from scipy.special import wofz
-    z = ((wavn-wavn0) + 1j*gamma)/(alpha)
-    V = S/(np.sqrt(np.pi)*alpha)*wofz(z).real
+    z = ((wavn-wavn0) + 1j*gamma)/(alpha/np.sqrt(2.))
+    V = S/(np.sqrt(np.pi/2.)*alpha)*wofz(z).real
     return(V)
 
 
@@ -151,7 +151,7 @@ def read_hitran2012_parfile(filename, wavemin=0., wavemax=60000., Smin=0.):
     return linelist
 
 
-def calculate_hitran_xsec(linelist, M, wavenumbers, T=296.e0, p=1.0e6, qmix=0.0, units='cm^2'):
+def calculate_hitran_xsec(linelist, M, wavenumbers, T=296.e0, P=1.01325e6, Pref=1.01325e6, qmix=0.0, wreach=25.0):
     """
     Given the HITRAN linelist (line centers and line strengths) for a molecule, digitize the result into a spectrum of
     absorption cross-section in units of cm^2.
@@ -172,7 +172,7 @@ def calculate_hitran_xsec(linelist, M, wavenumbers, T=296.e0, p=1.0e6, qmix=0.0,
     T : float
         Temperature in Kelvin
     P : float
-        Pressure in cgs (1 
+        Pressure in Pascal (1 atm = 101325 Pa)
 
     Returns
     -------
@@ -186,7 +186,10 @@ def calculate_hitran_xsec(linelist, M, wavenumbers, T=296.e0, p=1.0e6, qmix=0.0,
     c = constants.value('speed of light in vacuum')*1e2
     amu = constants.value('atomic mass constant')*1e3
     h = constants.value('Planck constant')*1e7
-    
+    hck = h*c/kb
+
+    print(kb, c, amu, h, hck)
+   
     xsec = np.zeros_like(wavenumbers)
 
     # check for errors in Epp (was an issue in previous versions of HITRAN)
@@ -194,7 +197,8 @@ def calculate_hitran_xsec(linelist, M, wavenumbers, T=296.e0, p=1.0e6, qmix=0.0,
         raise ValueError("Need to check for error flags in Epp")
 
     # scale line strengths to temperature
-    hck = h*c/kb
+
+    print(hck, np.max(linelist['S']))
     hckt = hck*(1./T-1./296.)
     qratio = [qtips(296.0,M,i)/qtips(T,M,i) for i in range(1,get_molecule_nisops(M)+1)]
     #linestrengths = linestrengths*(qtips(296., M)/qtips(T, M)) *exp(-hckt*Epps)
@@ -203,32 +207,38 @@ def calculate_hitran_xsec(linelist, M, wavenumbers, T=296.e0, p=1.0e6, qmix=0.0,
                      for (vc,S,I,Epp) in zip(linelist['vc'],linelist['S'],linelist['I'],linelist['Epp'])]
 
     # pre-calculate doppler widths and lorentz widths
-    vcs = linelist['vc'] + linelist['delta']*(p/1e6)
+    vcs = linelist['vc'] + linelist['delta']*(P/Pref)
     masses = [get_iso_mass(M,i)*amu for i in range(1,get_molecule_nisops(M)+1)]
-    alphas = [np.sqrt(2.0*kb*T/masses[int(I-1)]) for I in linelist['I']]*vcs/c
-    gammas = ((1.0-qmix)*linelist['gamma-air']+qmix*linelist['gamma-self']) * (p/1e6) / (T/296.)**linelist['N']
+    alphas = [np.sqrt(2.0*kb*T/masses[int(I-1)]) for I in linelist['I']] * vcs/c
+    gammas = ((1.0-qmix)*linelist['gamma-air']+qmix*linelist['gamma-self']) * (P/Pref) * (296./T)**linelist['N']
 
+    print(P, Pref, T, 296.)
+    for il, linecenter, linestrength, alpha, gamma in zip(range(len(vcs)), vcs, linestrengths, alphas, gammas):
+        print(linecenter, linestrength, alpha/np.sqrt(2.)*np.sqrt(2.*np.log(2.)), gamma) 
+        print(linelist['vc'][il], linelist['S'][il], linelist['gamma-air'][il], linelist['gamma-self'][il]) 
+        print((1.0-qmix)*linelist['gamma-air'][il], qmix*linelist['gamma-self'][il], (296./T)**linelist['N'][il])
+        print(qratio[0], masses[0], np.exp(-hckt*linelist['Epp'][il]), (1.0-np.exp(-hck*linelist['vc'][il]/T))/(1.0-np.exp(-hck*linelist['vc'][il]/296.0)))
+
+    #
     for linecenter, linestrength, alpha, gamma in zip(vcs, linestrengths, alphas, gammas):
-        #print(linecenter, linestrength, alpha, gamma) 
+        #print(linecenter, linestrength, alpha/np.sqrt(2.), gamma) 
         #L = lorentzian_profile(wavenumbers, linestrength, gamma, linecenter)
         #xsec += L
         #D = doppler_profile(wavenumbers, linestrength, alpha, linecenter)
         #xsec += D
-        V = voigt_profile(wavenumbers, linestrength, alpha, gamma, linecenter)
-        xsec += V
+        #V = voigt_profile(wavenumbers, linestrength, alpha, gamma, linecenter)
+        #xsec += V
 
         ## Note: the quantity sum(L * dk) should sum to "S"!
         #print(linestrength, V.sum()*(wavenumbers[1]-wavenumbers[0]),  D.sum()*(wavenumbers[1]-wavenumbers[0]),  L.sum()*(wavenumbers[1]-wavenumbers[0]))
 
-    if units.endswith('/mole'):
-        xsec = xsec * 6.022E23
-    elif units.endswith('.ppm'):
-        xsec = xsec * 2.686E19
+        i1 = np.searchsorted(wavenumbers, linecenter-wreach)
+        i2 = np.searchsorted(wavenumbers, linecenter+wreach)
+        #print(linecenter, i1, i2, len(wavenumbers))
+        V = voigt_profile(wavenumbers[i1:i2], linestrength, alpha, gamma, linecenter)
+        xsec[i1:i2] += V
 
-    if units.startswith('cm^2'):
-        pass
-    elif units.startswith('m^2'):
-        xsec = xsec / 10000.0
+
 
     return xsec
 
