@@ -104,6 +104,10 @@ def read_hitran2012_parfile(filename, wavemin=0., wavemax=60000., Smin=0.):
     print('Reading "' + filename + '" ...')
 
     for line in filehandle:
+
+        if (line[0] == '#'):
+            continue
+
         if (len(line) < 160):
             raise ImportError('The imported file ("' + filename + '") does not appear to be a HITRAN2012-format data file.')
 
@@ -188,7 +192,7 @@ def calculate_hitran_xsec(linelist, M, wavenumbers, T=296.e0, P=1.01325e6, Pref=
     h = constants.value('Planck constant')*1e7
     hck = h*c/kb
 
-    print(kb, c, amu, h, hck)
+    #print(kb, c, amu, h, hck)
    
     xsec = np.zeros_like(wavenumbers)
 
@@ -198,7 +202,7 @@ def calculate_hitran_xsec(linelist, M, wavenumbers, T=296.e0, P=1.01325e6, Pref=
 
     # scale line strengths to temperature
 
-    print(hck, np.max(linelist['S']))
+    #print(hck, np.max(linelist['S']))
     hckt = hck*(1./T-1./296.)
     qratio = [qtips(296.0,M,i)/qtips(T,M,i) for i in range(1,get_molecule_nisops(M)+1)]
     #linestrengths = linestrengths*(qtips(296., M)/qtips(T, M)) *exp(-hckt*Epps)
@@ -212,12 +216,12 @@ def calculate_hitran_xsec(linelist, M, wavenumbers, T=296.e0, P=1.01325e6, Pref=
     alphas = [np.sqrt(2.0*kb*T/masses[int(I-1)]) for I in linelist['I']] * vcs/c
     gammas = ((1.0-qmix)*linelist['gamma-air']+qmix*linelist['gamma-self']) * (P/Pref) * (296./T)**linelist['N']
 
-    print(P, Pref, T, 296.)
-    for il, linecenter, linestrength, alpha, gamma in zip(range(len(vcs)), vcs, linestrengths, alphas, gammas):
-        print(linecenter, linestrength, alpha/np.sqrt(2.)*np.sqrt(2.*np.log(2.)), gamma) 
-        print(linelist['vc'][il], linelist['S'][il], linelist['gamma-air'][il], linelist['gamma-self'][il]) 
-        print((1.0-qmix)*linelist['gamma-air'][il], qmix*linelist['gamma-self'][il], (296./T)**linelist['N'][il])
-        print(qratio[0], masses[0], np.exp(-hckt*linelist['Epp'][il]), (1.0-np.exp(-hck*linelist['vc'][il]/T))/(1.0-np.exp(-hck*linelist['vc'][il]/296.0)))
+    #print(P, Pref, T, 296.)
+    #for il, linecenter, linestrength, alpha, gamma in zip(range(len(vcs)), vcs, linestrengths, alphas, gammas):
+        #print(linecenter, linestrength, alpha/np.sqrt(2.)*np.sqrt(2.*np.log(2.)), gamma) 
+        #print(linelist['vc'][il], linelist['S'][il], linelist['gamma-air'][il], linelist['gamma-self'][il]) 
+        #print((1.0-qmix)*linelist['gamma-air'][il], qmix*linelist['gamma-self'][il], (296./T)**linelist['N'][il])
+        #print(qratio[0], masses[0], np.exp(-hckt*linelist['Epp'][il]), (1.0-np.exp(-hck*linelist['vc'][il]/T))/(1.0-np.exp(-hck*linelist['vc'][il]/296.0)))
 
     #
     for linecenter, linestrength, alpha, gamma in zip(vcs, linestrengths, alphas, gammas):
