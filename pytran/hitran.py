@@ -49,8 +49,8 @@ def voigt_profile(wavn, S, alpha, gamma, wavn0):
     voigt profile
     '''
     from scipy.special import wofz
-    z = ((wavn-wavn0) + 1j*gamma)/(alpha/np.sqrt(2.))
-    V = S/(np.sqrt(np.pi/2.)*alpha)*wofz(z).real
+    z = ((wavn-wavn0) + 1j*gamma)/(alpha)
+    V = S/(np.sqrt(np.pi)*alpha)*wofz(z).real
     return(V)
 
 
@@ -101,7 +101,7 @@ def read_hitran2012_parfile(filename, wavemin=0., wavemax=60000., Smin=0.):
                 'gpp':[]              ## statistical weight of the lower state
                 }
 
-    print('Reading "' + filename + '" ...')
+    #print('Reading "' + filename + '" ...')
 
     for line in filehandle:
 
@@ -155,7 +155,7 @@ def read_hitran2012_parfile(filename, wavemin=0., wavemax=60000., Smin=0.):
     return linelist
 
 
-def calculate_hitran_xsec(linelist, M, wavenumbers, T=296.e0, P=1.01325e6, Pref=1.01325e6, qmix=0.0, wreach=25.0):
+def calculate_hitran_xsec(linelist, M, wavenumbers, T=296.e0, P=101325., Pref=101325., qmix=0.0, wreach=25.0):
     """
     Given the HITRAN linelist (line centers and line strengths) for a molecule, digitize the result into a spectrum of
     absorption cross-section in units of cm^2.
@@ -174,9 +174,9 @@ def calculate_hitran_xsec(linelist, M, wavenumbers, T=296.e0, P=1.01325e6, Pref=
         {'cm^2/mole', 'cm^2.ppm', 'm^2/mole', 'm^2.ppm', 'm^2', cm^2}.
 
     T : float
-        Temperature in Kelvin
+        Temperature in Kelvin (Tref = 296. K)
     P : float
-        Pressure in Pascal (1 atm = 101325 Pa)
+        Pressure in Pascal (Pref = 1 atm = 101325 Pa)
 
     Returns
     -------
