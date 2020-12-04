@@ -138,11 +138,11 @@ def read_hitran2012_parfile(filename, wavemin=0., wavemax=60000., Smin=0.):
             linelist['Vpp'].append(line[82:97])
             linelist['Qp'].append(line[97:112])
             linelist['Qpp'].append(line[112:127])
-            linelist['Ierr'].append(line[127:133])
-            linelist['Iref'].append(line[133:145])
+            linelist['Ierr'].append(np.uint(line[127:133]))
+            linelist['Iref'].append(np.uint(line[133:145]))
             linelist['flag'].append(line[145])
-            linelist['gp'].append(line[146:153])
-            linelist['gpp'].append(line[153:160])
+            linelist['gp'].append(np.float64(line[146:153]))
+            linelist['gpp'].append(np.float64(line[153:160]))
 
     if filename.endswith('.zip'):
         zipf.close()
