@@ -192,6 +192,13 @@ def calculate_hitran_xsec(linelist, M, wavenumbers, T=296.e0, P=101325., Pref=10
     h = constants.value('Planck constant')*1e7
     hck = h*c/kb
 
+
+    kb = 1.3806488e-16        # erg K−1
+    hck = 1.4388
+
+    amu =  1.660539066e-24   # g
+    c = 2.99792458e10        # cm s−1
+
     #print(kb, c, amu, h, hck)
    
     xsec = np.zeros_like(wavenumbers)
@@ -218,10 +225,7 @@ def calculate_hitran_xsec(linelist, M, wavenumbers, T=296.e0, P=101325., Pref=10
 
     #print(P, Pref, T, 296.)
     #for il, linecenter, linestrength, alpha, gamma in zip(range(len(vcs)), vcs, linestrengths, alphas, gammas):
-        #print(linecenter, linestrength, alpha/np.sqrt(2.)*np.sqrt(2.*np.log(2.)), gamma) 
-        #print(linelist['vc'][il], linelist['S'][il], linelist['gamma-air'][il], linelist['gamma-self'][il]) 
-        #print((1.0-qmix)*linelist['gamma-air'][il], qmix*linelist['gamma-self'][il], (296./T)**linelist['N'][il])
-        #print(qratio[0], masses[0], np.exp(-hckt*linelist['Epp'][il]), (1.0-np.exp(-hck*linelist['vc'][il]/T))/(1.0-np.exp(-hck*linelist['vc'][il]/296.0)))
+    #    print(linecenter, linestrength, alpha, gamma) 
 
     #
     for linecenter, linestrength, alpha, gamma in zip(vcs, linestrengths, alphas, gammas):
