@@ -54,7 +54,7 @@ def voigt_profile(wavn, S, alpha, gamma, wavn0):
     return(V)
 
 
-def read_hitran2012_parfile(filename, wavemin=0., wavemax=60000., Smin=0.):
+def read_hitran2012_parfile(filename, wavemin=None, wavemax=None, Smin=None, isolist=None):
     """
     Given a HITRAN2012-format text file, read in the parameters of the molecular absorption features.
 
@@ -103,6 +103,12 @@ def read_hitran2012_parfile(filename, wavemin=0., wavemax=60000., Smin=0.):
 
     #print('Reading "' + filename + '" ...')
 
+    isochar_to_isonum = {'1':1,'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'0':10,'A':11,'B':12}
+
+    if (isolist is not None):
+        if isinstance(isolist,int):
+            isolist = (isolist,)
+    
     for line in filehandle:
 
         if (line[0] == '#'):
@@ -111,38 +117,43 @@ def read_hitran2012_parfile(filename, wavemin=0., wavemax=60000., Smin=0.):
         if (len(line) < 160):
             raise ImportError('The imported file ("' + filename + '") does not appear to be a HITRAN2012-format data file.')
 
+
+        M = np.uint(line[:2])
+        I = isochar_to_isonum[line[2]]
         vc = np.float64(line[3:15])
         S = np.float64(line[15:25])
-        if vc > wavemax:
+
+
+        if (wavemin is not None) and (vc < wavemin):
+            continue
+        if (Smin is not None) and (S < Smin):
+            continue
+        if (isolist is not None) and (I not in isolist):
+            continue
+        if (wavemax is not None) and (vc > wavemax):
             break  # don't need to continue to save
-        if ((wavemin <= vc) and (S > Smin)):
-            linelist['M'].append(np.uint(line[0:2]))
-            I = line[2]
-            if I == '0':
-                linelist['I'].append(np.uint(10))
-            elif I == 'a':
-                linelist['I'].append(np.uint(11))
-            elif I == 'b':
-                linelist['I'].append(np.uint(11))
-            else:
-                linelist['I'].append(np.uint(line[2]))
-            linelist['vc'].append(np.float64(line[3:15]))
-            linelist['S'].append(np.float64(line[15:25]))
-            linelist['Acoeff'].append(np.float64(line[25:35]))
-            linelist['gamma-air'].append(np.float64(line[35:40]))
-            linelist['gamma-self'].append(np.float64(line[40:45]))
-            linelist['Epp'].append(np.float64(line[45:55]))
-            linelist['N'].append(np.float64(line[55:59]))
-            linelist['delta'].append(np.float64(line[59:67]))
-            linelist['Vp'].append(line[67:82])
-            linelist['Vpp'].append(line[82:97])
-            linelist['Qp'].append(line[97:112])
-            linelist['Qpp'].append(line[112:127])
-            linelist['Ierr'].append(line[127:133])
-            linelist['Iref'].append(line[133:145])
-            linelist['flag'].append(line[145])
-            linelist['gp'].append(np.float64(line[146:153]))
-            linelist['gpp'].append(np.float64(line[153:160]))
+
+
+        # use line
+        linelist['M'].append(np.uint(M))
+        linelist['I'].append(np.uint(I))
+        linelist['vc'].append(np.float64(line[3:15]))
+        linelist['S'].append(np.float64(line[15:25]))
+        linelist['Acoeff'].append(np.float64(line[25:35]))
+        linelist['gamma-air'].append(np.float64(line[35:40]))
+        linelist['gamma-self'].append(np.float64(line[40:45]))
+        linelist['Epp'].append(np.float64(line[45:55]))
+        linelist['N'].append(np.float64(line[55:59]))
+        linelist['delta'].append(np.float64(line[59:67]))
+        linelist['Vp'].append(line[67:82])
+        linelist['Vpp'].append(line[82:97])
+        linelist['Qp'].append(line[97:112])
+        linelist['Qpp'].append(line[112:127])
+        linelist['Ierr'].append(line[127:133])
+        linelist['Iref'].append(line[133:145])
+        linelist['flag'].append(line[145])
+        linelist['gp'].append(np.float64(line[146:153]))
+        linelist['gpp'].append(np.float64(line[153:160]))
 
     if filename.endswith('.zip'):
         zipf.close()
