@@ -26,6 +26,8 @@ def parse_molparam_file(filename):
                 mlist[nmols][nisos]["gj"] = vars[3]
                 mlist[nmols][nisos]["mass"] = vars[4]
                 mlist[nmols][nisos]["gID"] = vars[5]
+            else:
+                print("skipping line (%d): %s"%(len(vars), line))
     return(mlist)
 
 if __name__ == '__main__':
@@ -34,10 +36,17 @@ if __name__ == '__main__':
 
     import numpy as np
 
+    testing = False
 
     mlist = parse_molparam_file('molparam.txt')
+    print("read in %d molecules from molparam.txt"%len(mlist))
 
-    with open('../pytran/hitran_supdata.py', 'w') as f:
+    if testing:
+        outfile = './hitran_supdate.py'
+    else:
+        outfile = '../pytran/hitran_supdata.py'
+
+    with open(outfile, 'w') as f:
 
         f.write("molparam = {}\n")
         for mol in sorted(mlist):
@@ -61,15 +70,18 @@ if __name__ == '__main__':
                             lines = f2.readlines()
                         T = np.array([line[:4].strip() for line in lines])
                         q = np.array([line[4:-1].strip() for line in lines])
+                        qs = ["%g"%float(val) for val in q[:1000]]
+                        print(mol, iso, T[0], T[-1])
                     else:
                         T = ["%d"%val for val in np.arange(1000) + 1.0]
-                        q = ["%d"%val for val in np.ones(1000)]
-                        print(mol,iso,len(T),len(q))
+                        Q296 = float(mlist[mol][iso]['Q296'])
+                        qs = ["%g"%Q296 for val in np.ones(1000)] 
+                        print(mol,iso,)
                     
                     f.write("qtab[%d][%d] = {\n" % (mol, iso))
                     f.write("    'Tmin':%s,\n" % T[0])
-                    f.write("    'Tmax':%s,\n" % T[-1])
-                    f.write("    'q':[%s],\n" % ", ".join(q))
+                    f.write("    'Tmax':%s,\n" % '1000.')
+                    f.write("    'q':[%s],\n" % ", ".join(qs))
                     f.write("}\n")
 
 
