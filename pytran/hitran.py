@@ -166,7 +166,7 @@ def read_hitran2012_parfile(filename, wavemin=None, wavemax=None, Smin=None, iso
     return linelist
 
 
-def calculate_hitran_xsec(linelist, M, wavenumbers, T=296.e0, P=101325., Pref=101325., qmix=0.0, wreach=25.0):
+def calculate_hitran_xsec(linelist, wavenumbers, M=None, T=296., P=101325., Pref=101325., qmix=0.0, wreach=25.0):
     """
     Given the HITRAN linelist (line centers and line strengths) for a molecule, digitize the result into a spectrum of
     absorption cross-section in units of cm^2.
@@ -175,44 +175,43 @@ def calculate_hitran_xsec(linelist, M, wavenumbers, T=296.e0, P=101325., Pref=10
     ----------
     linelist : dict of ndarrays
         The HITRAN data corresponding to a given molecule.
-    M : molecule number
-    wavemin : float, optional
-        The minimum wavenumber os the spectral region of interest.
-    wavemax : float, optional
-        The maximum wavenumber os the spectral region of interest.
-    units : str, optional
-        A string describing in what units of the output cross-section should be given in. Choices available are:
-        {'cm^2/mole', 'cm^2.ppm', 'm^2/mole', 'm^2.ppm', 'm^2', cm^2}.
-
+    wavenumber : ndarray of float
+        The wavenumber to compute the cross section
+    M : int, optional 
+        hitran molecule number. If not given, then read from linelist
     T : float
         Temperature in Kelvin (Tref = 296. K)
     P : float
-        Pressure in Pascal (Pref = 1 atm = 101325 Pa)
+        Pressure in same units as Pref (default is Pref in Pa)
+    Pref : float
+        Reference pressure, use to change pressure units (Pref = 1 atm = 101325 Pa)
+    qmix : float
+        mixing ration of species in abosolute units (e.g. 0. to 1.; default is 0.)
+    wreach : float
+        extend in wavenumber to compute individual lines (default is 25 cm^-1)
 
     Returns
     -------
     xsec : array_like
-        The mean absorption cross-section (in cm^2) per molecule, evaluated at the wavenumbers given by input `waves`.
+        The mean absorption cross-section, in cm^2 per molecule, evaluated at the wavenumbers given by input `wavenumbers`.
     """
 
-    import scipy.constants as constants
-
-    kb = constants.value('Boltzmann constant')*1e7
-    c = constants.value('speed of light in vacuum')*1e2
-    amu = constants.value('atomic mass constant')*1e3
-    h = constants.value('Planck constant')*1e7
-    hck = h*c/kb
-
-
+    #use constants from hitran for consistency, not from scipy.constants
     kb = 1.3806488e-16        # erg K−1
     hck = 1.4388
-
     amu =  1.660539066e-24   # g
     c = 2.99792458e10        # cm s−1
-
     #print(kb, c, amu, h, hck)
-   
+
+    # initialize xsec
     xsec = np.zeros_like(wavenumbers)
+
+    # check M (M to be removed)
+    if M == None:
+        unique_M = np.unique(linelist['M'])
+        if len(unique_M) != 1:
+            raise Exception('pytran.calculate_hitran_crosssection expects only one molecule in linelist')
+        M = unique_M[0]
 
     # check for errors in Epp (was an issue in previous versions of HITRAN)
     if any(linelist['Epp']<0.0):
@@ -223,8 +222,6 @@ def calculate_hitran_xsec(linelist, M, wavenumbers, T=296.e0, P=101325., Pref=10
     #print(hck, np.max(linelist['S']))
     hckt = hck*(1./T-1./296.)
     qratio = [qtips(296.0,M,i)/qtips(T,M,i) for i in range(1,get_molecule_nisops(M)+1)]
-    #linestrengths = linestrengths*(qtips(296., M)/qtips(T, M)) *exp(-hckt*Epps)
-    #linestrengths = [S*qratio[int(I-1)]*exp(-hckt*Epp) for (S,I,Epp) in zip(linestrengths,isops,Epps)]
     linestrengths = [S*qratio[int(I-1)]*np.exp(-hckt*Epp)*(1.0-np.exp(-hck*vc/T))/(1.0-np.exp(-hck*vc/296.0))
                      for (vc,S,I,Epp) in zip(linelist['vc'],linelist['S'],linelist['I'],linelist['Epp'])]
 
@@ -257,137 +254,4 @@ def calculate_hitran_xsec(linelist, M, wavenumbers, T=296.e0, P=101325., Pref=10
         V = voigt_profile(wavenumbers[i1:i2], linestrength, alpha, gamma, linecenter)
         xsec[i1:i2] += V
 
-
-
     return xsec
-
-
-
-### ======================================================
-#def downsample_spectrum(waves, spectrum, downsampled_waves=None, downsampled_channel_boundaries=None):
-#    '''
-#    (Right now, we assume uniformly sampled wavelengths/wavenumbers.)
-#    '''
-#
-#    nwaves = np.alen(waves)
-#
-#    ## If it is not already defined, make the list of channel boundary wavelengths.
-#    if (downsampled_waves != None) and (downsampled_channel_boundaries == None):
-#        dw = downsampled_waves[1] - downsampled_waves[0]
-#        downsampled_channel_boundaries = append(amin(downsampled_waves)-(dw/2.0), downsampled_waves+(dw/2.0))
-#    elif (downsampled_waves == None) and (downsampled_channel_boundaries == None):
-#        raise ValueError('Either "downsampled_waves" or "downsampled_channel_boundaries" is required as an input.')
-#
-#    ## Generate the channel basis functions used to represent the low-resolution spectral channels in terms
-#    ## of the high-resolution data.
-#    nchannels = alen(downsampled_channel_boundaries) - 1
-#    #print('downwaves=', downwaves)
-#    #print('downsampled_channel_boundaries=', downsampled_channel_boundaries)
-#    downspectrum = zeros(nchannels)
-#
-#    ## From the list of channel boundary wavelengths, generate the channel basis functions.
-#    for n in arange(nchannels):
-#        okay = (waves > downsampled_channel_boundaries[n]) * (waves <= downsampled_channel_boundaries[n+1])
-#        downspectrum[n] = nanmean(spectrum[okay])
-#
-#    return(downsampled_channel_boundaries, downspectrum)
-#
-#
-### =================================================================================================
-#def draw_block_spectrum(channel_boundaries, spectrum, newfigure=True, title=None, **kwargs):
-#    '''
-#    Draw a plot where the spectral channels are nonuniform in width and shaped by histogram-like rectangles.
-#
-#    Parameters
-#    ----------
-#    channel_boundaries : array_like
-#        A vector of length Nw+1 giving the wavelengths defining the boundaries of the Nw spectral channels.
-#    spectrum : array_like
-#        A Nw length vector.
-#    newfigure : bool
-#        Whether or not to call matplotlib's `figure()` function.
-#    title : str
-#        The plot title.
-#    **kwargs : any
-#        Any keyword arguments that can be used by matplotlib's `plot()` function.
-#    '''
-#
-#    from matplotlib import pyplot as plt
-#
-#    channel_boundaries = asarray(channel_boundaries)
-#    spectrum = asarray(spectrum)
-#    assert (np.alen(channel_boundaries) == 1 + np.alen(spectrum)), 'Input "channel_boundaries" must have length 1 more than input "spectrum".'
-#
-#    cb = channel_boundaries
-#    nchannels = alen(cb) - 1
-#
-#    x = []
-#    y = []
-#    x.append(cb[0])
-#    y.append(0.0)
-#
-#    for n in arange(nchannels):
-#        x.append(cb[n])
-#        x.append(cb[n+1])
-#        y.append(spectrum[n])
-#        y.append(spectrum[n])
-#
-#    x.append(cb[-1])
-#    y.append(0.0)
-#
-#    if newfigure:
-#        fig = plt.figure()
-#        if (title != None): fig.canvas.set_window_title(title)
-#        xmin = amin(x)
-#        xmax = amax(x)
-#        xptp = xmax - xmin
-#        xmean = 0.5 * (xmin + xmax)
-#        xlo = xmean - 0.55 * xptp
-#        xhi = xmean + 0.55 * xptp
-#
-#        ymin = amin(y)
-#        ymax = amax(y)
-#        yptp = ymax - ymin
-#        ymean = 0.5 * (ymin + ymax)
-#        ylo = ymean - 0.55 * yptp
-#        yhi = ymean + 0.55 * yptp
-#    else:
-#        ## First grab the existing plot limits. If these were previously determined by draw_block_spectrum(),
-#        ## then we need only rescale the plot range by (0.5/0.55) to get to the original data limits.
-#        ## Appending these to the current data vector, we can update the plot limits using both old and new
-#        ## data. First grab the existing limits.
-#        (x0,x1,y0,y1) = plt.axis()
-#
-#        x0mean = 0.5 * (x0 + x1)
-#        x0ptp = (0.5 / 0.55) * (x1 - x0)
-#        x0min = x0mean - 0.5 * x0ptp
-#        x0max = x0mean + 0.5 * x0ptp
-#
-#        y0mean = 0.5 * (y0 + y1)
-#        y0ptp = (0.5 / 0.55) * (y1 - y0)
-#        y0min = y0mean - 0.5 * y0ptp
-#        y0max = y0mean + 0.5 * y0ptp
-#
-#        ## Next determine the new plot range using the old and new data limits.
-#        xmin = amin(append(array(x), x0min))
-#        xmax = amax(append(array(x), x0max))
-#        xptp = xmax - xmin
-#        xmean = 0.5 * (xmin + xmax)
-#        xlo = xmean - 0.55 * xptp
-#        xhi = xmean + 0.55 * xptp
-#
-#        ymin = amin(append(array(y), y0min))
-#        ymax = amax(append(array(y), y0max))
-#        yptp = ymax - ymin
-#        ymean = 0.5 * (ymin + ymax)
-#        ylo = ymean - 0.55 * yptp
-#        yhi = ymean + 0.55 * yptp
-#
-#    plt.plot(x, y, **kwargs)
-#    if (title != None): plt.title(title)
-#    if newfigure:
-#        plt.axis([xlo,xhi,ylo,yhi])
-#
-#    return
-
-
