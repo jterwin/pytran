@@ -41,6 +41,11 @@ if __name__ == '__main__':
     mlist = parse_molparam_file('molparam.txt')
     print("read in %d molecules from molparam.txt"%len(mlist))
 
+    NbMol = len(mlist)
+    NbIso = np.sum([len(mlist[i+1])-1 for i in range(NbMol)])
+    NbMaxIso = np.max([len(mlist[i+1])-1 for i in range(NbMol)])
+    print(NbMol, NbIso, NbMaxIso)
+
     if testing:
         outfile = './hitran_supdate.py'
     else:
@@ -48,20 +53,29 @@ if __name__ == '__main__':
 
     with open(outfile, 'w') as f:
 
-        f.write("molparam = {}\n")
+        f.write("# counts of molecules and isotopologues\n")
+        f.write("NbMol = %d\n" % NbMol)
+        f.write("NbIso = %d\n" % NbIso)
+        f.write("NbMaxIso = %d\n" % NbMaxIso)
+        f.write("\n")
+
+        f.write("# molecule parameters\n")
+        f.write("molparam = {\n")
         for mol in sorted(mlist):
-            f.write("molparam[%d] = {\n" % mol)
-            f.write("    'name' : '%s',\n" % mlist[mol]['name'])
+            f.write("    %d : {\n" % mol)
+            f.write("        'name' : '%s',\n" % mlist[mol]['name'])
             for iso in range(20):
                 if iso in mlist[mol]:
-                    f.write("    %d : {'iso':'%s', 'abundance':%s, 'Q296':%s, 'gj':%s, 'mass':%s},\n" % (iso, mlist[mol][iso]['iso'], mlist[mol][iso]['abundance'], mlist[mol][iso]['Q296'], mlist[mol][iso]['gj'], mlist[mol][iso]['mass']))
-            f.write("}\n")
+                    f.write("        %d : {'iso':'%s', 'abundance':%s, 'Q296':%s, 'gj':%s, 'mass':%s},\n" % (iso, mlist[mol][iso]['iso'], mlist[mol][iso]['abundance'], mlist[mol][iso]['Q296'], mlist[mol][iso]['gj'], mlist[mol][iso]['mass']))
+            f.write("    },\n")
+        f.write("}\n\n")
+
 
         f.write("\n")
         f.write("# tabulated qtips values\n")
-        f.write("qtab = {}\n")
+        f.write("qtab = {\n")
         for mol in sorted(mlist):
-            f.write("qtab[%d] = {}\n" % mol)
+            f.write("    %d : {\n" % mol)
             for iso in range(20):
                 if iso in mlist[mol]:
                     filename = 'qtips_files/q%s.txt'%mlist[mol][iso]['gID']
@@ -71,18 +85,22 @@ if __name__ == '__main__':
                         T = np.array([line[:4].strip() for line in lines])
                         q = np.array([line[4:-1].strip() for line in lines])
                         qs = ["%g"%float(val) for val in q[:1000]]
-                        print(mol, iso, T[0], T[-1])
+                        #print(mol, iso, T[0], T[-1])
                     else:
                         T = ["%d"%val for val in np.arange(1000) + 1.0]
                         Q296 = float(mlist[mol][iso]['Q296'])
                         qs = ["%g"%Q296 for val in np.ones(1000)] 
-                        print(mol,iso,)
+                        #print(mol,iso,)
                     
-                    f.write("qtab[%d][%d] = {\n" % (mol, iso))
-                    f.write("    'Tmin':%s,\n" % T[0])
-                    f.write("    'Tmax':%s,\n" % '1000.')
-                    f.write("    'q':[%s],\n" % ", ".join(qs))
-                    f.write("}\n")
+                    #f.write("        %d : {\n" % (iso))
+                    #f.write("            'Tmin':%s,\n" % T[0])
+                    #f.write("            'Tmax':%s,\n" % '1000.')
+                    #f.write("            'q':[%s],\n" % ", ".join(qs))
+                    #f.write("        },\n")
 
+                    f.write("        %d : {'Tmin':%s, 'Tmax':%s, 'q':[%s]},\n" % (iso, T[0], '1000', ", ".join(qs)))
 
+            f.write("    },\n")
+
+        f.write("}\n")
         
