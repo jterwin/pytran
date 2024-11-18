@@ -11,7 +11,23 @@ One should obtain their own copy of hitran parameter files, for instance from th
 
 #### reading linelist and computing cross section
 
+In the simplest example, you can read in a par file to a linelist dictionary (using `pytran.read_hitran2012_parfile`) and then compute the extiction cross section (using `pytran.calculate_hitran_xsec`):
+```
+    parfilename = './supdata/05_hit20_0_1000.par'
+    linelist = pytran.read_hitran2012_parfile(parfilename)
 
+    wn = np.arange(0., 400., 1.e-3)
+    sigma = pytran.calculate_hitran_xsec(linelist, wn, T, P)
+```
+The script `test_hitran_lbl.py` provides a complete example.
+
+Both function can take additional arguments refine the computation. 
+
+#### utilities
+
+Several functions are provided which interact with the molecular parameters and total internal partition sums (`get_molecule_id`, `get_iso_id`, `get_molecule_mass`, `get_iso_name`, `get_iso_mass`, `get_molecule_nisops`, `qtips`). They are mainly used by `pytran.calculate_hitran_xsec` to correct the line strength and line parameters. 
+
+The script `test_supdata.py` provides some examples on their usages.
 
 ### Design Goals
 
