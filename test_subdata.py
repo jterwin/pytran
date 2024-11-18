@@ -34,6 +34,8 @@ if __name__ == '__main__':
         print("\t%d: %.4f" % (nmol,pytran.get_molecule_mass(nmol)))
 
     print("\ntest qtips")
-    print([pytran.qtips(tmp, 2, 1) for tmp in np.logspace(1,3,10)])
+    for tmp in np.logspace(0,3,13):
+        print("\t%.1f: %.1f" % (tmp, pytran.qtips(tmp, 2, 1)))
+
         
 

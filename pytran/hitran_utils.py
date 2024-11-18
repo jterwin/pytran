@@ -250,15 +250,23 @@ def qtips(tmp, nmol, niso=1):
     """
 
     if nmol not in qtab:
-        raise LookupError("nmol=%d not in qtab"%nmol)
+        raise LookupError("hitran_utils.qtips: nmol=%d not in qtab"%nmol)
     if niso not in qtab[nmol]:
-        raise LookupError("niso=%d not in qtab[%d]"%(niso,nmol))
-    if tmp < qtab[nmol][niso]['Tmin'] or tmp > qtab[nmol][niso]['Tmax']:
-        raise ValueError("tmp=%f outside of range (%.1f, %.1f)" % (tmp, qtab[nmol][niso]['Tmin'], qtab[nmol][niso]['Tmax']))
+        raise LookupError("hitran_utils.qtips: niso=%d not in qtab[%d]"%(niso,nmol))
 
-    dt = tmp - qtab[nmol][niso]['Tmin']
-    it = int(dt)
-    ft = dt - it
+    if tmp < qtab[nmol][niso]['Tmin']:
+        print("hitran_utils.qtips: temp too low, interpolating to boundary")
+        it = 0
+        ft = 0
+    if tmp < qtab[nmol][niso]['Tmax']:
+        dt = tmp - qtab[nmol][niso]['Tmin']
+        it = int(dt)
+        ft = dt - it
+    else:
+        print("hitran_utils.qtips: temp too high, interpolating to boundary",)
+        it = len(qtab[nmol][niso]['q'])-2
+        ft = 1.
+
     q = qtab[nmol][niso]['q'][it]*(1.-ft) + qtab[nmol][niso]['q'][it+1]*ft
 
     return q
