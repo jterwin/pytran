@@ -1,10 +1,8 @@
 
-from __future__ import division, print_function, absolute_import
-
-from pytran.hitran_supdata import molparam, qtab
+from pytran.hitran_supdata import NbMol, NbIso, NbMaxIso, molparam, qtab
 
 __all__ = ['get_molecule_id', 'get_iso_id', 'get_molecule_mass', 'get_iso_name',
-           'get_iso_mass', 'get_molecule_nisops', 'qtips']
+           'get_iso_mass', 'get_molecule_nisops', 'qtips', 'qtips_all']
 
 
 def get_molecule_id(name):
@@ -243,10 +241,6 @@ def qtips(tmp, nmol, niso=1):
     q : float
         interpolated TIPS value
 
-    Notes
-    -----
-    Uses parsum values for 
-
     """
 
     if nmol not in qtab:
@@ -268,5 +262,32 @@ def qtips(tmp, nmol, niso=1):
         ft = 1.
 
     q = qtab[nmol][niso]['q'][it]*(1.-ft) + qtab[nmol][niso]['q'][it+1]*ft
+
+    return q
+
+
+def qtips_all(tmp):
+    """
+    Computes TIPS value HITRAN molecule
+
+    Parameters
+    ----------
+    tmp : float
+        temperature
+
+    Returns
+    -------
+    q : float array
+        interpolated TIPS value for all molecules and isotopologues
+
+    """
+    import numpy as np
+
+    q = np.ones((NbMol+1,NbMaxIso+1))  # add 1 since hitran is 1-indexed
+
+    for imol in range(1,NbMol+1):
+        nIso = get_molecule_nisops(imol)
+        for iiso in range(1,nIso+1):
+            q[imol,iiso] = qtips(tmp, imol, iiso)
 
     return q

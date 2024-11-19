@@ -1,9 +1,5 @@
 
-
-from __future__ import print_function, division
-
-
-from pytran.hitran_utils import qtips, get_molecule_nisops, get_iso_mass
+from pytran.hitran_utils import qtips, qtips_all, get_molecule_nisops, get_iso_mass
 
 import numpy as np
 
@@ -166,7 +162,7 @@ def read_hitran2012_parfile(filename, wavemin=None, wavemax=None, Smin=None, iso
     return linelist
 
 
-def calculate_hitran_xsec(linelist, wavenumbers, M=None, T=296., P=101325., Pref=101325., qmix=0.0, wreach=25.0):
+def calculate_hitran_xsec(linelist, wavenumbers, T=296., P=101325., Pref=101325., qmix=0.0, wreach=25.0):
     """
     Given the HITRAN linelist (line centers and line strengths) for a molecule, digitize the result into a spectrum of
     absorption cross-section in units of cm^2.
@@ -206,29 +202,20 @@ def calculate_hitran_xsec(linelist, wavenumbers, M=None, T=296., P=101325., Pref
     # initialize xsec
     xsec = np.zeros_like(wavenumbers)
 
-    # check M (M to be removed)
-    if M == None:
-        unique_M = np.unique(linelist['M'])
-        if len(unique_M) != 1:
-            raise Exception('pytran.calculate_hitran_crosssection expects only one molecule in linelist')
-        M = unique_M[0]
-
     # check for errors in Epp (was an issue in previous versions of HITRAN)
     if any(linelist['Epp']<0.0):
         raise ValueError("Need to check for error flags in Epp")
 
     # scale line strengths to temperature
-
-    #print(hck, np.max(linelist['S']))
     hckt = hck*(1./T-1./296.)
-    qratio = [qtips(296.0,M,i)/qtips(T,M,i) for i in range(1,get_molecule_nisops(M)+1)]
-    linestrengths = [S*qratio[int(I-1)]*np.exp(-hckt*Epp)*(1.0-np.exp(-hck*vc/T))/(1.0-np.exp(-hck*vc/296.0))
-                     for (vc,S,I,Epp) in zip(linelist['vc'],linelist['S'],linelist['I'],linelist['Epp'])]
+    QRatio = qtips_all(296.0)/qtips_all(T)
+    QT = [QRatio[M,I] for (M,I) in zip(linelist['M'],linelist['I'])]
+    linestrengths = linelist['S'] * QT * np.exp(-hckt*linelist['Epp']) * (1.0-np.exp(-hck*linelist['vc']/T))/(1.0-np.exp(-hck*linelist['vc']/296.0))
 
     # pre-calculate doppler widths and lorentz widths
     vcs = linelist['vc'] + linelist['delta']*(P/Pref)
-    masses = [get_iso_mass(M,i)*amu for i in range(1,get_molecule_nisops(M)+1)]
-    alphas = [np.sqrt(2.0*kb*T/masses[int(I-1)]) for I in linelist['I']] * vcs/c
+    masses = np.array([get_iso_mass(M,I)*amu for (M,I) in zip(linelist['M'],linelist['I'])])
+    alphas = np.sqrt(2.0*kb*T/masses) * vcs/c
     gammas = ((1.0-qmix)*linelist['gamma-air']+qmix*linelist['gamma-self']) * (P/Pref) * (296./T)**linelist['N']
 
     #print(P, Pref, T, 296.)
